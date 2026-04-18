@@ -178,13 +178,13 @@ async function main(): Promise<void> {
 
   const config = await loadConfig();
   const backend = getBackend(config, backendName);
+  const backendArgs = rest.slice(2);
 
-  // "tools" 는 ACL 체크 제외 (내장 명령)
-  if (subcommand !== "tools") {
+  // ACL 체크 제외: 내장 명령(tools) + --help
+  const isHelp = subcommand === "--help" || subcommand === "-h" || backendArgs.includes("--help") || backendArgs.includes("-h");
+  if (subcommand !== "tools" && !isHelp) {
     checkAcl(backend, subcommand, backendName);
   }
-
-  const backendArgs = rest.slice(2);
 
   if (backend.type === "mcp") {
     const result = await executeMcp(backend, config.headers, subcommand, backendArgs);
