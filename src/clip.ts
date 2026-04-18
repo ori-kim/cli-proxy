@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { checkAcl } from "./acl.ts";
 import { executeCli } from "./cli-backend.ts";
-import { CONFIG_DIR, addBackend, getBackend, loadConfig, removeBackend } from "./config.ts";
+import { type Backend, CONFIG_DIR, addBackend, getBackend, loadConfig, removeBackend } from "./config.ts";
 import { die } from "./errors.ts";
 import { executeMcp } from "./mcp-backend.ts";
 import { formatOutput } from "./output.ts";
@@ -152,6 +152,28 @@ async function parseAndAddBackend(args: string[]): Promise<void> {
   }
 }
 
+// --- backend help ---
+
+function printBackendHelp(name: string, backend: Backend): void {
+  const detail = backend.type === "mcp" ? `MCP server: ${backend.url}` : `CLI command: ${backend.command}`;
+  console.log(`clip ${name} — ${detail}`);
+  console.log(`\nUsage: clip ${name} <subcommand> [...args]`);
+
+  if (backend.allow && backend.allow.length > 0) {
+    console.log(`\nAllowed: ${backend.allow.join(", ")}`);
+  }
+  if (backend.deny && backend.deny.length > 0) {
+    console.log(`Denied:  ${backend.deny.join(", ")}`);
+  }
+  if (!backend.allow?.length && !backend.deny?.length) {
+    console.log(`\nNo ACL restrictions.`);
+  }
+
+  if (backend.type === "mcp") {
+    console.log(`\nRun: clip ${name} tools  — to list available tools`);
+  }
+}
+
 // --- 메인 ---
 
 async function main(): Promise<void> {
@@ -171,18 +193,20 @@ async function main(): Promise<void> {
     return;
   }
 
-  const subcommand = rest[1];
-  if (!subcommand) {
-    die(`Usage: clip ${backendName} <subcommand> [...args]\nRun: clip ${backendName} tools`);
-  }
-
   const config = await loadConfig();
   const backend = getBackend(config, backendName);
+
+  const subcommand = rest[1];
+  if (!subcommand || subcommand === "--help" || subcommand === "-h") {
+    printBackendHelp(backendName, backend);
+    process.exit(0);
+  }
+
   const backendArgs = rest.slice(2);
 
-  // ACL 체크 제외: 내장 명령(tools) + --help
-  const isHelp = subcommand === "--help" || subcommand === "-h" || backendArgs.includes("--help") || backendArgs.includes("-h");
-  if (subcommand !== "tools" && !isHelp) {
+  // ACL 체크 제외: 내장 명령(tools) + --help in args
+  const hasHelpFlag = backendArgs.includes("--help") || backendArgs.includes("-h");
+  if (subcommand !== "tools" && !hasHelpFlag) {
     checkAcl(backend, subcommand, backendName);
   }
 
