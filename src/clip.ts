@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { checkAcl } from "./acl.ts";
 import { executeCli } from "./cli-backend.ts";
-import { CONFIG_PATH, addBackend, getBackend, loadConfig, removeBackend } from "./config.ts";
+import { CONFIG_DIR, addBackend, getBackend, loadConfig, removeBackend } from "./config.ts";
 import { die } from "./errors.ts";
 import { executeMcp } from "./mcp-backend.ts";
 import { formatOutput } from "./output.ts";
@@ -23,7 +23,7 @@ Global flags:
   --version, -v Show version
 
 Config:
-  ${CONFIG_PATH}
+  ${CONFIG_DIR}/settings.{yml,json}
 
 Examples:
   clip superset execute_sql --sql "SELECT 1"
