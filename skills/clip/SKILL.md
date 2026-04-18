@@ -13,7 +13,7 @@ Routes external CLI tools, MCP servers, and OpenAPI REST APIs through a single g
 
 | Via `clip` | Direct |
 |---|---|
-| `kaf`, `kubectl`, `gh`, `notion`, `linear` | `grep`, `jq`, `curl`, `bun`, `npm`, `git` |
+| `gh`, `notion`, `linear`, `slack`, `jira`, `aws`, `gcloud`, `terraform` | `grep`, `jq`, `curl`, `bun`, `npm`, `git` |
 
 ## Usage
 
