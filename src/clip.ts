@@ -154,7 +154,7 @@ async function parseAndAddBackend(args: string[]): Promise<void> {
 
 // --- backend help ---
 
-function printBackendHelp(name: string, backend: Backend): void {
+async function printBackendHelp(name: string, backend: Backend): Promise<void> {
   const detail = backend.type === "mcp" ? `MCP server: ${backend.url}` : `CLI command: ${backend.command}`;
   console.log(`clip ${name} — ${detail}`);
   console.log(`\nUsage: clip ${name} <subcommand> [...args]`);
@@ -171,6 +171,24 @@ function printBackendHelp(name: string, backend: Backend): void {
 
   if (backend.type === "mcp") {
     console.log(`\nRun: clip ${name} tools  — to list available tools`);
+  }
+
+  // 원래 명령의 --help 출력도 표시
+  if (backend.type === "cli") {
+    const proc = Bun.spawn([backend.command, ...(backend.args ?? []), "--help"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...(backend.env ?? {}) } as Record<string, string>,
+    });
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout as ReadableStream<Uint8Array>).text(),
+      new Response(proc.stderr as ReadableStream<Uint8Array>).text(),
+    ]);
+    const helpText = (stdout || stderr).trim();
+    if (helpText) {
+      console.log(`\n--- ${backend.command} --help ---\n`);
+      console.log(helpText);
+    }
   }
 }
 
@@ -198,7 +216,7 @@ async function main(): Promise<void> {
 
   const subcommand = rest[1];
   if (!subcommand || subcommand === "--help" || subcommand === "-h") {
-    printBackendHelp(backendName, backend);
+    await printBackendHelp(backendName, backend);
     process.exit(0);
   }
 
