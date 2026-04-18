@@ -13,9 +13,11 @@ clip — CLI proxy for MCP servers and CLI tools
 
 Usage:
   clip [--json] <backend> <subcommand> [...args]
-  clip config list|add|remove
+  clip add <name> <command-or-url> [--allow x,y] [--deny z]
+  clip remove <name>
+  clip list
   clip <backend> tools
-  clip <backend> <tool> --help
+  clip <backend> --help
 
 Global flags:
   --json        Output as JSON (unwraps MCP content, wraps CLI stdout)
@@ -26,12 +28,12 @@ Config:
   ${CONFIG_DIR}/settings.{yml,json}
 
 Examples:
+  clip add gh gh --deny delete,apply
+  clip add superset https://superset-mcp.kr/mcp --allow execute_sql
+  clip list
   clip superset execute_sql --sql "SELECT 1"
   clip --json gh pr list
   clip gh get pods -n default
-  clip config add superset --type mcp --url https://superset-mcp.kr/mcp
-  clip config add gh --type cli --command gh --deny delete,apply
-  clip config list
 `.trim();
 
 // --- argv 수동 파싱 ---
@@ -69,54 +71,38 @@ function parseGlobalFlags(argv: string[]): {
   return { jsonMode, configPath, rest: argv.slice(i) };
 }
 
-// --- config 서브커맨드 ---
+// --- list / add / remove ---
 
-async function runConfigCmd(args: string[]): Promise<void> {
-  const sub = args[0];
-
-  if (!sub || sub === "list") {
-    const config = await loadConfig();
-    const backends = Object.entries(config.backends);
-    if (backends.length === 0) {
-      console.log("No backends configured.");
-      console.log(`\nAdd one:\n  clip config add <name> --type mcp --url <url>`);
-      console.log(`  clip config add <name> --type cli --command <cmd>`);
-      return;
-    }
-    console.log("Backends:");
-    for (const [name, b] of backends.sort()) {
-      const detail = b.type === "mcp" ? b.url : b.command;
-      const acl = [
-        b.allow && b.allow.length > 0 ? `allow: ${b.allow.join(",")}` : "",
-        b.deny && b.deny.length > 0 ? `deny: ${b.deny.join(",")}` : "",
-      ]
-        .filter(Boolean)
-        .join("  ");
-      console.log(`  ${name.padEnd(16)} [${b.type}] ${detail}${acl ? `  (${acl})` : ""}`);
-    }
+async function runList(): Promise<void> {
+  const config = await loadConfig();
+  const backends = Object.entries(config.backends);
+  if (backends.length === 0) {
+    console.log("No backends configured.");
+    console.log(`\nAdd one:\n  clip add <name> <command>          # CLI tool`);
+    console.log(`  clip add <name> <https://...>      # MCP server`);
     return;
   }
-
-  if (sub === "add") {
-    parseAndAddBackend(args.slice(1));
-    return;
+  console.log("Backends:");
+  for (const [name, b] of backends.sort()) {
+    const detail = b.type === "mcp" ? b.url : b.command;
+    const acl = [
+      b.allow && b.allow.length > 0 ? `allow: ${b.allow.join(",")}` : "",
+      b.deny && b.deny.length > 0 ? `deny: ${b.deny.join(",")}` : "",
+    ]
+      .filter(Boolean)
+      .join("  ");
+    console.log(`  ${name.padEnd(16)} [${b.type}] ${detail}${acl ? `  (${acl})` : ""}`);
   }
-
-  if (sub === "remove") {
-    const name = args[1];
-    if (!name) die('Usage: clip config remove <name>');
-    await removeBackend(name);
-    console.log(`Removed backend "${name}".`);
-    return;
-  }
-
-  die(`Unknown config subcommand: "${sub}"\nUsage: clip config list|add|remove`);
 }
 
-async function parseAndAddBackend(args: string[]): Promise<void> {
+async function runAdd(args: string[]): Promise<void> {
   const name = args[0];
-  if (!name || name.startsWith("--")) die("Usage: clip config add <name> --type mcp|cli --url <url> | --command <cmd>");
+  if (!name || name.startsWith("--")) {
+    die("Usage: clip add <name> <command-or-url> [--allow x,y] [--deny z]");
+  }
 
+  // 두 번째 positional (플래그가 아닌 것) 수집
+  const positionals: string[] = [];
   const flags: Record<string, string> = {};
   for (let i = 1; i < args.length; i++) {
     const a = args[i] ?? "";
@@ -129,27 +115,52 @@ async function parseAndAddBackend(args: string[]): Promise<void> {
       } else {
         flags[key] = "true";
       }
+    } else {
+      positionals.push(a);
     }
   }
-
-  const type = flags["type"];
-  if (type !== "mcp" && type !== "cli") die("--type must be 'mcp' or 'cli'");
 
   const allow = flags["allow"] ? flags["allow"].split(",").map((s) => s.trim()) : undefined;
   const deny = flags["deny"] ? flags["deny"].split(",").map((s) => s.trim()) : undefined;
 
+  // 타입 결정: --type 명시 > --url/--command 명시 > positional 자동 감지
+  let type = flags["type"] as "mcp" | "cli" | undefined;
+  if (!type && flags["url"]) type = "mcp";
+  if (!type && flags["command"]) type = "cli";
+  if (!type && positionals[0]) {
+    type = positionals[0].startsWith("http://") || positionals[0].startsWith("https://") ? "mcp" : "cli";
+  }
+  if (!type) die("Cannot detect type. Provide <command-or-url> or --type mcp|cli");
+
   if (type === "mcp") {
-    const url = flags["url"];
-    if (!url) die("MCP backend requires --url");
+    const url = flags["url"] ?? positionals[0];
+    if (!url) die("MCP backend requires a URL (e.g. clip add myserver https://...mcp)");
     await addBackend(name, { type: "mcp", url, allow, deny });
     console.log(`Added MCP backend "${name}" → ${url}`);
   } else {
-    const command = flags["command"];
-    if (!command) die("CLI backend requires --command");
+    const command = flags["command"] ?? positionals[0];
+    if (!command) die("CLI backend requires a command (e.g. clip add gh gh)");
     const prependArgs = flags["args"] ? flags["args"].split(",").map((s) => s.trim()) : undefined;
     await addBackend(name, { type: "cli", command, args: prependArgs, allow, deny });
     console.log(`Added CLI backend "${name}" → ${command}`);
   }
+}
+
+async function runRemove(args: string[]): Promise<void> {
+  const name = args[0];
+  if (!name) die("Usage: clip remove <name>");
+  await removeBackend(name);
+  console.log(`Removed backend "${name}".`);
+}
+
+// --- config 서브커맨드 (하위 호환) ---
+
+async function runConfigCmd(args: string[]): Promise<void> {
+  const sub = args[0];
+  if (!sub || sub === "list") return runList();
+  if (sub === "add") return runAdd(args.slice(1));
+  if (sub === "remove") return runRemove(args.slice(1));
+  die(`Unknown config subcommand: "${sub}"\nUsage: clip config list|add|remove`);
 }
 
 // --- backend help ---
@@ -205,11 +216,11 @@ async function main(): Promise<void> {
 
   const backendName = rest[0]!;
 
-  // config 서브커맨드
-  if (backendName === "config") {
-    await runConfigCmd(rest.slice(1));
-    return;
-  }
+  // 내장 명령
+  if (backendName === "config") { await runConfigCmd(rest.slice(1)); return; }
+  if (backendName === "list") { await runList(); return; }
+  if (backendName === "add") { await runAdd(rest.slice(1)); return; }
+  if (backendName === "remove") { await runRemove(rest.slice(1)); return; }
 
   const config = await loadConfig();
   const backend = getBackend(config, backendName);
