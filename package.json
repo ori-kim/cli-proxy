@@ -1,0 +1,21 @@
+{
+  "name": "clip",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "clip": "./clip"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest"
+  }
+}
