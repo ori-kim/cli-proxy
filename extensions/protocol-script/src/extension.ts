@@ -58,13 +58,14 @@ export const extension: ClipExtension = {
       },
       urlHeuristic: () => false,
       addHandler: async (args: AddArgs) => {
-        const { name, flags, allow, deny } = args;
+        const { name, flags, allow, deny, timeoutMs } = args;
         const description = flags["description"];
         await addTarget(name, "script", {
           ...(description ? { description } : {}),
           commands: {},
           allow,
           deny,
+          ...(timeoutMs ? { timeoutMs } : {}),
         });
         console.log(`Added script target "${name}".`);
       },

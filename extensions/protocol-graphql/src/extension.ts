@@ -47,19 +47,22 @@ export const extension: ClipExtension = {
         const headers = t.headers as Record<string, string> | undefined;
         const statusTag = authStatus
           ? color("2", `  [${authStatus}]`)
-          : t.oauth ? color("2", "  [not authenticated]")
-          : headers?.["authorization"] ? color("2", "  [api key]")
-          : color("2", "  [no auth]");
+          : t.oauth
+            ? color("2", "  [not authenticated]")
+            : headers?.["authorization"]
+              ? color("2", "  [api key]")
+              : color("2", "  [no auth]");
         const profileTag = (t as Record<string, unknown>).active ? ` @${(t as Record<string, unknown>).active}` : "";
         const aclStr = formatAcl(t as Record<string, unknown>);
         return `  ${nm} ${t.endpoint}${profileTag}${aclStr}${statusTag}${bind(name)}`;
       },
       urlHeuristic: (url) => url.toLowerCase().endsWith("/graphql"),
       addHandler: async (args: AddArgs) => {
-        const { name, positionals, flags, allow, deny } = args;
+        const { name, positionals, flags, allow, deny, timeoutMs } = args;
         const endpoint = flags["endpoint"] ?? positionals[0];
-        if (!endpoint) die("GraphQL target requires an endpoint URL (e.g. clip add gh https://api.github.com/graphql --graphql)");
-        await addTarget(name, "graphql", { endpoint, allow, deny });
+        if (!endpoint)
+          die("GraphQL target requires an endpoint URL (e.g. clip add gql https://api.example.com/graphql --graphql)");
+        await addTarget(name, "graphql", { endpoint, allow, deny, ...(timeoutMs ? { timeoutMs } : {}) });
         console.log(`Added GraphQL target "${name}" → ${endpoint}`);
       },
       helpRenderer: async (_name, target) => {

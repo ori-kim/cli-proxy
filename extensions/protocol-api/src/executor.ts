@@ -1,7 +1,17 @@
 import { join } from "path";
 import YAML from "yaml";
 import { AuthenticatedClient, resolveAuthDir } from "@clip/auth";
-import { CONFIG_DIR, buildAliasSection, die, findTargetConfigDir, formatToolHelp, parseToolArgs } from "@clip/core";
+import {
+  ClipError,
+  CONFIG_DIR,
+  buildAliasSection,
+  die,
+  findTargetConfigDir,
+  formatToolHelp,
+  parseToolArgs,
+  resolveTargetTimeoutMs,
+  withTargetTimeoutSignal,
+} from "@clip/core";
 import type { ExecutorContext, TargetResult, Tool } from "@clip/core";
 import { parseOpenApi } from "./openapi.ts";
 import type { ApiTarget } from "./schema.ts";
@@ -11,7 +21,12 @@ function specCachePath(targetName: string): string {
   return join(dir, "spec.json");
 }
 
-async function loadSpec(targetName: string, target: ApiTarget, forceRefresh = false): Promise<unknown> {
+async function loadSpec(
+  targetName: string,
+  target: ApiTarget,
+  forceRefresh = false,
+  timeoutMs = resolveTargetTimeoutMs(target),
+): Promise<unknown> {
   const specUrl = target.openapiUrl;
   const cachePath = specCachePath(targetName);
   const cacheFile = Bun.file(cachePath);
@@ -38,28 +53,26 @@ async function loadSpec(targetName: string, target: ApiTarget, forceRefresh = fa
     }
   }
 
-  let resp: Response;
-  if (target.auth === "oauth") {
-    const client = new AuthenticatedClient({
-      targetName,
-      targetType: "api",
-      serverUrl: specUrl,
-      oauthEnabled: true,
-      configDir: resolveAuthDir(targetName, "api"),
-    });
-    resp = await client.fetch(specUrl).catch((e: unknown) => {
-      die(`Failed to fetch OpenAPI spec from ${specUrl}: ${e}`);
-    });
-  } else {
-    resp = await fetch(specUrl).catch((e: unknown) => {
-      die(`Failed to fetch OpenAPI spec from ${specUrl}: ${e}`);
-    });
-  }
+  const { resp, text } = await withTargetTimeoutSignal(timeoutMs, `OpenAPI spec ${targetName}`, async (signal) => {
+    const resp =
+      target.auth === "oauth"
+        ? await new AuthenticatedClient({
+            targetName,
+            targetType: "api",
+            serverUrl: specUrl,
+            oauthEnabled: true,
+            configDir: resolveAuthDir(targetName, "api"),
+          }).fetch(specUrl, { signal })
+        : await fetch(specUrl, { signal });
+    return { resp, text: await resp.text() };
+  }).catch((e: unknown) => {
+    if (e instanceof ClipError) throw e;
+    die(`Failed to fetch OpenAPI spec from ${specUrl}: ${e}`);
+  });
   if (!resp.ok) {
     die(`Failed to fetch OpenAPI spec: HTTP ${resp.status} from ${specUrl}`);
   }
 
-  const text = await resp.text();
   let parsed: unknown;
 
   const ct = resp.headers.get("Content-Type") ?? "";
@@ -106,7 +119,8 @@ export function buildCurlCommand(
 export async function executeApi(target: ApiTarget, ctx: ExecutorContext): Promise<TargetResult> {
   const { headers: globalHeaders, subcommand, args: rawArgs, targetName, dryRun } = ctx;
   const forceRefresh = subcommand === "refresh";
-  const raw = await loadSpec(targetName, target, forceRefresh);
+  const timeoutMs = resolveTargetTimeoutMs(target);
+  const raw = await loadSpec(targetName, target, forceRefresh, timeoutMs);
   const spec = parseOpenApi(raw);
 
   if (subcommand === "refresh") {
@@ -233,16 +247,26 @@ export async function executeApi(target: ApiTarget, ctx: ExecutorContext): Promi
   const authHeaders = await client.getAuthHeaders();
   Object.assign(mergedHeaders, authHeaders);
 
-  const resp = await client.fetch(fullUrl, {
-    method: tool.method,
-    headers: mergedHeaders,
-    body,
-  }).catch((e: unknown) => {
+  const { resp, respCt, respText } = await withTargetTimeoutSignal(
+    timeoutMs,
+    `API ${tool.method.toUpperCase()} ${fullUrl}`,
+    async (signal) => {
+      const resp = await client.fetch(fullUrl, {
+        method: tool.method,
+        headers: mergedHeaders,
+        body,
+        signal,
+      });
+      return {
+        resp,
+        respCt: resp.headers.get("Content-Type") ?? "",
+        respText: await resp.text(),
+      };
+    },
+  ).catch((e: unknown) => {
+    if (e instanceof ClipError) throw e;
     die(`Failed to connect to ${fullUrl}: ${e}`);
   });
-
-  const respCt = resp.headers.get("Content-Type") ?? "";
-  const respText = await resp.text();
 
   if (!resp.ok) {
     return {

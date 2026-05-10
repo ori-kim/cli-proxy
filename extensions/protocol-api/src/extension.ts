@@ -46,9 +46,11 @@ export const extension: ClipExtension = {
         const auth = t.auth;
         const statusTag = authStatus
           ? color("2", `  [${authStatus}]`)
-          : auth === "oauth" ? color("2", "  [not authenticated]")
-          : auth === "apikey" ? color("2", "  [api key]")
-          : color("2", "  [no auth]");
+          : auth === "oauth"
+            ? color("2", "  [not authenticated]")
+            : auth === "apikey"
+              ? color("2", "  [api key]")
+              : color("2", "  [no auth]");
         const profileTag = (t as Record<string, unknown>).active ? ` @${(t as Record<string, unknown>).active}` : "";
         const url = (t.baseUrl ?? t.openapiUrl ?? "") as string;
         const aclStr = formatAcl(t as Record<string, unknown>);
@@ -59,11 +61,18 @@ export const extension: ClipExtension = {
         return /\/(openapi|swagger)\.(json|ya?ml)$/.test(lower) || /\/openapi\.json$/.test(lower);
       },
       addHandler: async (args: AddArgs) => {
-        const { name, positionals, flags, allow, deny } = args;
+        const { name, positionals, flags, allow, deny, timeoutMs } = args;
         const baseUrl = flags["base-url"] ?? flags["baseUrl"] ?? positionals[0];
         if (!baseUrl) die("API target requires a base URL (e.g. clip add petstore https://api.example.com)");
         const openapiUrl = flags["openapi-url"] ?? flags["openapiUrl"];
-        await addTarget(name, "api", { auth: false, baseUrl, ...(openapiUrl ? { openapiUrl } : {}), allow, deny });
+        await addTarget(name, "api", {
+          auth: false,
+          baseUrl,
+          ...(openapiUrl ? { openapiUrl } : {}),
+          allow,
+          deny,
+          ...(timeoutMs ? { timeoutMs } : {}),
+        });
         console.log(`Added API target "${name}" → ${baseUrl}`);
         try {
           const resp = await fetch(openapiUrl ?? baseUrl);
@@ -85,7 +94,9 @@ export const extension: ClipExtension = {
               );
             }
           }
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
       },
       helpRenderer: async (_name, target) => {
         const t = target as ApiTarget;

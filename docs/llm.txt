@@ -16,6 +16,8 @@ clip <target> types                    # list types (gRPC/GraphQL)
 
 Global flags: `--json`, `--pipe`, `--dry-run` — can appear anywhere in the command.
 
+Target timeout priority: target config `timeoutMs` → `CLIP_TARGET_TIMEOUT_MS` → default `30000` ms.
+
 ## Target types
 
 | Type | Register | Notes |
@@ -46,6 +48,7 @@ command: gh
 args: []
 env:
   GH_TOKEN: "${GH_TOKEN}"
+timeoutMs: 30000
 allow: [pr, repo, issue]
 deny: [delete]
 acl:
@@ -181,7 +184,8 @@ metadata:
   authorization: "Bearer ${API_TOKEN}"
 reflectMetadata:
   authorization: "Bearer ${API_TOKEN}"
-deadline: 30
+timeoutMs: 30000
+# deadline: 30  # legacy seconds-based timeout
 emitDefaults: false
 ```
 
@@ -307,9 +311,9 @@ clip profile list mygh
 clip profile unset mygh
 ```
 
-`profile add` flags: `--args`, `--command`, `--env KEY=VAL`, `--url`, `--endpoint`, `--address`, `--base-url`, `--header KEY:VAL`, `--metadata KEY=VAL`.
+`profile add` flags: `--args`, `--command`, `--env KEY=VAL`, `--url`, `--endpoint`, `--address`, `--base-url`, `--header KEY:VAL`, `--metadata KEY=VAL`, `--timeout-ms N`.
 
-Merge rules: scalar/array fields replace, map fields (env/headers/metadata) merge. ACL is target-only.
+Merge rules: scalar/array fields (including timeoutMs) replace, map fields (env/headers/metadata) merge. ACL is target-only.
 
 ---
 

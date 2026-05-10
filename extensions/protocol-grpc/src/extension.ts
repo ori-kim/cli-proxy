@@ -48,16 +48,18 @@ export const extension: ClipExtension = {
         const metadata = t.metadata as Record<string, string> | undefined;
         const statusTag = authStatus
           ? color("2", `  [${authStatus}]`)
-          : t.oauth ? color("2", "  [not authenticated]")
-          : metadata?.["authorization"] ? color("2", "  [api key]")
-          : color("2", "  [no auth]");
+          : t.oauth
+            ? color("2", "  [not authenticated]")
+            : metadata?.["authorization"]
+              ? color("2", "  [api key]")
+              : color("2", "  [no auth]");
         const profileTag = (t as Record<string, unknown>).active ? ` @${(t as Record<string, unknown>).active}` : "";
         const aclStr = formatAcl(t as Record<string, unknown>);
         return `  ${nm} ${t.address}${profileTag}${aclStr}${statusTag}${bind(name)}`;
       },
       urlHeuristic: () => false,
       addHandler: async (args: AddArgs) => {
-        const { name, positionals, flags, allow, deny } = args;
+        const { name, positionals, flags, allow, deny, timeoutMs } = args;
         const address = flags["address"] ?? positionals[0];
         if (!address) die("gRPC target requires an address (e.g. clip add petstore grpc.example.com:443 --grpc)");
         const proto = flags["proto"] ?? undefined;
@@ -68,6 +70,7 @@ export const extension: ClipExtension = {
           ...(plaintext ? { plaintext } : {}),
           allow,
           deny,
+          ...(timeoutMs ? { timeoutMs } : {}),
         });
         console.log(`Added gRPC target "${name}" → ${address}`);
       },

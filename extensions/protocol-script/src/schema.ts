@@ -1,5 +1,5 @@
+import { aclFields, aliasFields, profileFields, timeoutFields } from "@clip/core";
 import { z } from "zod";
-import { aclFields, aliasFields, profileFields } from "@clip/core";
 
 const RESERVED_SCRIPT_CMDS = ["tools", "describe", "types", "refresh", "login", "logout"];
 
@@ -24,6 +24,7 @@ export const scriptTargetSchema = z.object({
     })
     .default({}),
   env: z.record(z.string()).optional(),
+  ...timeoutFields,
   ...aclFields,
   ...profileFields,
   ...aliasFields,

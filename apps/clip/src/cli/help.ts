@@ -11,7 +11,7 @@ clip — CLI proxy for MCP servers and CLI tools
 
 Usage:
   clip [--json] [--pipe] <target> <subcommand> [...args]
-  clip add <name> <command-or-url> [--allow x,y] [--deny z]
+  clip add <name> <command-or-url> [--allow x,y] [--deny z] [--timeout-ms N]
   clip add <name> <https://...openapi.json> [--api]
   clip add <name> <https://...> --sse
   clip remove <name>
@@ -19,7 +19,7 @@ Usage:
   clip refresh <target>
   clip login <target>
   clip logout <target>
-  clip profile add <target> <profile> [--args a,b,c] [--url ...] [--env K=V]
+  clip profile add <target> <profile> [--args a,b,c] [--url ...] [--env K=V] [--timeout-ms N]
   clip profile use <target> <profile>   Set active profile
   clip profile list <target>            List profiles
   clip profile remove <target> <profile>
@@ -47,6 +47,7 @@ Global flags:
 Config:
   ~/.clip/target/{mcp,cli,api,grpc,graphql,script}/<name>/config.yml
   Set CLIP_HOME to use a different root directory (default: ~/.clip)
+  Set CLIP_TARGET_TIMEOUT_MS to override target timeout globally (default: 30000)
 
 Native bind PATH setup (add to shell profile):
   export PATH="${BIND_DIR}:$PATH"
@@ -108,17 +109,10 @@ Zsh completion:
   ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 `.trim();
 
-export async function printTargetHelp(
-  name: string,
-  type: string,
-  target: unknown,
-  registry?: Registry,
-): Promise<void> {
+export async function printTargetHelp(name: string, type: string, target: unknown, registry?: Registry): Promise<void> {
   // contribution의 helpRenderer가 있으면 사용, 없으면 fallback
   const contribution = registry?.getContribution(type);
-  const detail = contribution?.helpRenderer
-    ? await contribution.helpRenderer(name, target)
-    : `${type} target`;
+  const detail = contribution?.helpRenderer ? await contribution.helpRenderer(name, target) : `${type} target`;
 
   console.log(`clip ${name} — ${detail}`);
   console.log(`\nUsage: clip ${name} <subcommand> [...args]`);
