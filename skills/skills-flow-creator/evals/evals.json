@@ -1,0 +1,17 @@
+{
+  "skill_name": "skills-flow-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a skills-flow package for a skill that reviews code changes, asks for clarification when requirements are vague, and writes a short review report.",
+      "expected_output": "A package plan with SKILL.md, flow.json, step markdown files, create workflow branch, validation notes, and no embedded long step instructions in flow.json.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Migrate an existing SKILL.md that has sections for intake, research, writing, user approval, and export into skills-flow format.",
+      "expected_output": "A migration plan that preserves frontmatter, maps each existing section to graph nodes, creates edges for sequence and approval, and lists unmapped behavior.",
+      "files": []
+    }
+  ]
+}

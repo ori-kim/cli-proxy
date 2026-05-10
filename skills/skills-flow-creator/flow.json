@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1",
+  "name": "skills-flow-creator",
+  "entryNode": "intake",
+  "nodes": [
+    {
+      "id": "intake",
+      "type": "human.input",
+      "name": "Capture Skill Request",
+      "link": "steps/intake.md"
+    },
+    {
+      "id": "choose-workflow",
+      "type": "decision",
+      "name": "Choose Create Or Migration",
+      "link": "steps/choose-workflow.md"
+    },
+    {
+      "id": "create-brief",
+      "type": "create",
+      "name": "Shape New Skill Brief",
+      "link": "steps/create-brief.md"
+    },
+    {
+      "id": "create-graph",
+      "type": "create",
+      "name": "Design New Skill Graph",
+      "link": "steps/create-graph.md"
+    },
+    {
+      "id": "migration-inspect",
+      "type": "migration",
+      "name": "Inspect Existing Skill",
+      "link": "steps/migration-inspect.md"
+    },
+    {
+      "id": "migration-map",
+      "type": "migration",
+      "name": "Map Legacy Skill To Graph",
+      "link": "steps/migration-map.md"
+    },
+    {
+      "id": "write-package",
+      "type": "authoring",
+      "name": "Write Skills Flow Package",
+      "link": "steps/write-package.md"
+    },
+    {
+      "id": "verify-package",
+      "type": "verification",
+      "name": "Verify Graph Package",
+      "link": "steps/verify-package.md"
+    }
+  ],
+  "edges": [
+    {
+      "id": "intake-to-choose-workflow",
+      "from": "intake",
+      "to": "choose-workflow",
+      "type": "control.next",
+      "name": "Request captured"
+    },
+    {
+      "id": "choose-workflow-to-create-brief",
+      "from": "choose-workflow",
+      "to": "create-brief",
+      "type": "branch.create",
+      "name": "Create new skill"
+    },
+    {
+      "id": "choose-workflow-to-migration-inspect",
+      "from": "choose-workflow",
+      "to": "migration-inspect",
+      "type": "branch.migration",
+      "name": "Migrate existing skill"
+    },
+    {
+      "id": "create-brief-to-create-graph",
+      "from": "create-brief",
+      "to": "create-graph",
+      "type": "control.next",
+      "name": "Brief ready"
+    },
+    {
+      "id": "create-graph-to-write-package",
+      "from": "create-graph",
+      "to": "write-package",
+      "type": "control.next",
+      "name": "Graph approved"
+    },
+    {
+      "id": "migration-inspect-to-migration-map",
+      "from": "migration-inspect",
+      "to": "migration-map",
+      "type": "control.next",
+      "name": "Legacy skill understood"
+    },
+    {
+      "id": "migration-map-to-write-package",
+      "from": "migration-map",
+      "to": "write-package",
+      "type": "control.next",
+      "name": "Mapping ready"
+    },
+    {
+      "id": "write-package-to-verify-package",
+      "from": "write-package",
+      "to": "verify-package",
+      "type": "control.next",
+      "name": "Package written"
+    },
+    {
+      "id": "verify-package-to-create-graph",
+      "from": "verify-package",
+      "to": "create-graph",
+      "type": "loop.rework",
+      "name": "Create graph needs revision"
+    },
+    {
+      "id": "verify-package-to-migration-map",
+      "from": "verify-package",
+      "to": "migration-map",
+      "type": "loop.rework",
+      "name": "Migration mapping needs revision"
+    }
+  ]
+}
